@@ -1,0 +1,9 @@
+#!/bin/bash
+# git rebase-all-branches
+
+# prefixes and suffixes separated with /
+prefixes='wip|bug'
+suffixes='wip|bug|v[0-9]+.*$'
+
+git rebase -i -r "$@"
+GIT_SEQUENCE_EDITOR="sed -re '/^label (onto|branch-point)/{p;d}; /^label/{h;s:^label (.+)$:x git branch -f \1 HEAD:;x;p;x;s:($prefixes)-:\1/:g;s:-($suffixes):/\1:g}' -i" git rebase -i -r "$@"

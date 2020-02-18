@@ -1,0 +1,4 @@
+#!/bin/bash
+# git format-incremental-patches
+
+git format-patch "$@" | tee /dev/stderr | awk '{ if (l) printf("cat %s %s|sponge %s\0", l, $0, $0); l=$0 }' | xargs -0 -n1 bash -c

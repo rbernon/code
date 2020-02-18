@@ -1,0 +1,9 @@
+#!/bin/bash
+# git list-merged-branches
+
+pfx=("wip/*" "bug/*")
+
+if [[ "${1:-}" == "-v" ]]; then v=-v; shift; else v=; fi
+if [[ "${1:-}" == */* ]]; then pfx=("${pfx[@]/#/${1%/*}/}"); fi
+
+git branch --list "${pfx[@]}" | grep $v -f <(git branch --merged "${1:-master}" | sed 's:^:^:;s:$:$:') | cut -c3-
