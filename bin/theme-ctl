@@ -1,0 +1,22 @@
+#!/bin/bash
+
+profile=$(gsettings get org.gnome.Terminal.ProfilesList default|xargs echo)
+
+case "$1" in
+  light)
+    gsettings set org.gnome.desktop.interface gtk-theme Arc
+    gsettings set org.gnome.shell.extensions.user-theme name Arc
+    gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$profile/ use-theme-colors true
+    sed -re 's@"color_scheme": "[^"]+"@"color_scheme": "Packages/Theme - Spacegray/base16-ocean.light.tmTheme"@' \
+        -re 's@"theme": "[^"]+"@"theme": "Spacegray Light.sublime-theme"@' \
+        -i "$HOME/.config/sublime-text-3/Packages/User/Preferences.sublime-settings"
+    ;;
+  dark)
+    gsettings set org.gnome.desktop.interface gtk-theme Arc-Dark
+    gsettings set org.gnome.shell.extensions.user-theme name Arc-Dark
+    gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$profile/ use-theme-colors false
+    sed -re 's@"color_scheme": "[^"]+"@"color_scheme": "Packages/Theme - Spacegray/base16-eighties.dark.tmTheme"@' \
+        -re 's@"theme": "[^"]+"@"theme": "Spacegray Eighties.sublime-theme"@' \
+        -i "$HOME/.config/sublime-text-3/Packages/User/Preferences.sublime-settings"
+    ;;
+esac
