@@ -1,0 +1,10 @@
+#!/bin/bash
+
+valgrind "$@" 3>&2 2>&1 1>&3 | while read line; do
+  if [[ "$line" == *": ??? (in "* ]]; then
+    eval $(echo "$line" | sed -re 's@^.*0x([0-9A-F]+): \?\?\? \(in (.*)\)$@addr="\1"\nfile="\2"@')
+    echo "$addr" | addr2line -i -f -e "$file" | xargs -n2 printf '%s @ %s\n' | xargs -I{} bash -c "echo '$line' | sed -re 's%\\?\\?\\?%{}%'"
+  else
+    echo "$line"
+  fi 3>&2 2>&1 1>&3
+done

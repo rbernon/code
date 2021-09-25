@@ -44,68 +44,17 @@ $(3)$(1)::
 	git -C $(3)$(1) checkout --quiet $($(1)_VERSION)
 endef
 
-
-VULKAN_SRCS = glslang \
-              SPIRV-Headers \
-              SPIRV-Tools \
-              Vulkan-Headers \
-              Vulkan-Loader \
-              Vulkan-ValidationLayers
-
-glslang_VERSION = origin/master
-SPIRV-Headers_VERSION = origin/master
-SPIRV-Tools_VERSION = origin/stable
-Vulkan-Headers_VERSION = sdk-1.2.131.1
-Vulkan-Loader_VERSION = sdk-1.2.131.1
-Vulkan-ValidationLayers_VERSION = sdk-1.2.131.1
-
-$(foreach t,$(VULKAN_SRCS),$(eval $(call make-source-rules,$(t),https://github.com/KhronosGroup,vulkan/)))
-
-vulkan/CMakeLists.txt: $(patsubst %,vulkan/%,$(VULKAN_SRCS))
-	echo "cmake_minimum_required(VERSION 3.13)" > vulkan/CMakeLists.txt
-	echo "project(vulkan)" >> vulkan/CMakeLists.txt
-	$(patsubst %,echo "add_subdirectory(%)" >>vulkan/CMakeLists.txt;,$(VULKAN_SRCS))
-
-vulkan: vulkan/CMakeLists.txt
-	cmake -Bbuild-$@ -H$@ \
-	  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-	  -DCMAKE_INSTALL_PREFIX=$(HOME)/.local \
-	  -DBUILD_LAYER_SUPPORT_FILES=ON \
-	  -DCMAKE_CXX_FLAGS="-fsanitize=undefined" \
-	  -DCMAKE_C_FLAGS="-fsanitize=undefined"
-	$(MAKE) -C build-$@ install
-.PHONY: vulkan
-
-
-Vulkan-Tools_VERSION = sdk-1.2.131.1
-
-$(eval $(call make-source-rules,Vulkan-Tools,https://github.com/KhronosGroup,vulkan/))
-
-vulkan-tools: vulkan/Vulkan-Tools
-	cmake -Bbuild-$@ -Hvulkan/Vulkan-Tools \
-	  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-	  -DCMAKE_INSTALL_PREFIX=$(HOME)/.local \
-	  -DVulkan_LIBRARY=$(HOME)/.local/lib/libvulkan.so \
-	  -DVulkan_INCLUDE_DIR=$(HOME)/.local/include \
-	  -DVULKAN_HEADERS_INSTALL_DIR=$(HOME)/.local/include \
-	  -DVULKAN_LOADER_INSTALL_DIR=$(HOME)/.local \
-	  -DVULKAN_VALIDATIONLAYERS_INSTALL_DIR=$(HOME)/.local \
-	  -DCMAKE_INSTALL_SYSCONFDIR=share \
-	  -DCMAKE_CXX_FLAGS="-fsanitize=undefined" \
-	  -DCMAKE_C_FLAGS="-fsanitize=undefined"
-	$(MAKE) -C build-$@ install
-.PHONY: vulkan-tools
-
-
-renderdoc_VERSION = origin/v1.x
-
-$(eval $(call make-source-rules,renderdoc,https://github.com/baldurk,))
-
-renderdoc::
-	cmake -Bbuild-$@ -H$@ \
-	  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-	  -DCMAKE_INSTALL_PREFIX=$(HOME)/.local \
-	  -DVULKAN_LAYER_FOLDER=$(HOME)/.local/share/vulkan/implicit_layer.d \
-	  -DCMAKE_CXX_FLAGS="-fsanitize=undefined" \
-	  -DCMAKE_C_FLAGS="-fsanitize=undefined"
-	$(MAKE) -C build-$@ install
+include make/vulkan.mk
+include make/vulkan-tools.mk
+include make/renderdoc.mk
+include make/mesa.mk
+include make/google-benchmark.mk
+include make/benchmarks.mk
+include make/dxvk.mk
+include make/cairo.mk
+include make/wine-gecko.mk
+include make/faudio.mk
+include make/ghidra.mk
+include make/tests.mk
+include make/nlopt.mk
+include make/dlib.mk

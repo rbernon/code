@@ -1,0 +1,22 @@
+#!/bin/bash
+
+set -ex
+
+for v in 6.0-rc1; do
+cd staging/wine
+git reset --hard
+git clean -fdx
+git checkout --detach wine-$v
+cd -
+git reset --hard
+git clean -fdx
+git checkout v6.0rc1
+staging/patchupdate.py --skip-bugs --skip-checks
+patches/patchinstall.sh DESTDIR=$PWD/staging/wine --force-autoconf --all
+cd staging/wine
+git add *
+git commit -m "Staging $v"
+git tag -f wine-staging-$v
+git push github -f wine-staging-$v
+cd -
+done

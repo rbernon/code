@@ -3,7 +3,9 @@ ifneq ($(V),1)
 MAKEFLAGS += --quiet --no-print-directory
 --quiet? := --quiet
 else
-MAKEFLAGS += V=1 VERBOSE=1 RUNTESTFLAGS="-P wine"
-MFLAGS += V=1 VERBOSE=1 RUNTESTFLAGS="-P wine"
+TESTFLAGS := RUNTESTFLAGS=-v
+MAKEFLAGS += V=1 VERBOSE=1 
+MFLAGS += V=1 VERBOSE=1
+--verbose? := --verbose
 -v? := -v
 endif

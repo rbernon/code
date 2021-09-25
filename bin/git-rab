@@ -5,5 +5,10 @@
 prefixes='wip|bug'
 suffixes='wip|bug|v[0-9]+.*$'
 
+GIT_SEQUENCE_EDITOR="sed -re '1 s/^/break\n/' -re 's/#.+$//g' \
+                         -re '/^label/{s:(tmp|$prefixes)-:\1/:g;s:-(tmp|$suffixes):/\1:g}' \
+                         -re '/^reset/{s:(tmp|$prefixes)-:\1/:g;s:-(tmp|$suffixes):/\1:g}' \
+                         -re '/^merge/{s:(tmp|$prefixes)-:\1/:g;s:-(tmp|$suffixes):/\1:g}' \
+                         -re '/^label (onto|branch-point)/{p;d}; /^label .*($prefixes)\//{h;s:^label (.+)$:x git branch -f \1 HEAD:;x;p;x;}' -i" \
 git rebase -i -r "$@"
-GIT_SEQUENCE_EDITOR="sed -re '/^label (onto|branch-point)/{p;d}; /^label/{h;s:^label (.+)$:x git branch -f \1 HEAD:;x;p;x;s:($prefixes)-:\1/:g;s:-($suffixes):/\1:g}' -i" git rebase -i -r "$@"
+git rebase --edit-todo && git rebase --continue

@@ -1,25 +1,51 @@
-define create-source-rules
-$(2)_SRC ?= src-$(1)
+# parameters:
+#   $(1): lowercase package name
+#   $(2): uppercase package name
+#   $(3): source directory
+#
+# inputs:
+#   $(PKG): variable, package source folder
+#
+# outputs:
+#   $($(2)_SRC): variable, absolute rsynced source folder
+#   $(1)-rebuild: target, call it to force package rebuild
+#   $(1)-source: target, tracking package source changes
+#   $(1)-clean: target, clean package and force rebuild
+#
+define create-rules-source
+$(2)_SRC ?= $$(OBJ)/src-$(1)
 
-ifeq ($(3),nodelete)
-$(1)-rsync := rsync --filter=:C --exclude=.git --info=name -Oarx $$(abspath $$($(2)))/ $$(abspath $$($(2)_SRC))
-else
-$(1)-rsync := rsync --filter=:C --exclude=.git --info=name -Oarx --delete $$(abspath $$($(2)))/ $$(abspath $$($(2)_SRC))
-endif
+ifeq ($(CONTAINER),)
+$(1)-rebuild:
+.PHONY: $(1)-rebuild
 
-.$(1)-source: $(MAKEFILE_DEP) $$(shell echo -n 'syncing $(1)... ' >&2 && \
-                                       $$($(1)-rsync) | grep -q ^ && echo $(1)-rebuild && \
-                                       echo 'done: rebuilding' >&2 || echo 'done: up to date' >&2)
+$$(OBJ)/.$(1)-source: SHELL := $$(SHELL)
+$$(OBJ)/.$(1)-source: $$(if $$(NO_MAKEFILE_DEPENDENCY),,$$(MAKEFILE_LIST))
+$$(OBJ)/.$(1)-source: $$(shell echo -n 'syncing $(1)... ' >&2 && \
+                              rsync --dry-run --filter=:C --exclude '*~' --exclude .git $$($(2)_SOURCE_ARGS) --info=name -Oarx --delete "$$(abspath $(3))/" "$$($(2)_SRC)" | \
+                              grep -v -e ^$$$$ | grep -q ^ && echo $(1)-rebuild && \
+                              echo 'done, dirty' >&2 || echo 'done' >&2)
+	rsync --filter=:C --exclude '*~' --exclude .git $$($(2)_SOURCE_ARGS) --info=name -Oarx --delete "$$(abspath $(3))/" "$$($(2)_SRC)" --quiet
 	touch $$@
-$(1)-source: .$(1)-source
-.INTERMEDIATE: $(1)-source
 
-$(1)-clean::
-$(1)-distclean::
+$$(OBJ)/.$(1)-post-source: $$(OBJ)/.$(1)-source
+container-build: $$(OBJ)/.$(1)-post-source
+
+$(1)-source: $$(OBJ)/.$(1)-post-source
+.PHONY: $(1)-source
+
+all-source: $(1)-source
+.PHONY: all-source
+
+all: all-source
+.PHONY: all
+
+clean::
 	rm -rf $$($(2)_SRC)
-$(1)-rebuild::
-	rm -f .$(1)-source
-
-clean: $(1)-clean
-distclean: $(1)-distclean
+endif
 endef
+
+rules-source = $(call create-rules-source,$(1),$(call toupper,$(1)),$(2))
+
+$(OBJ)/.%-post-source:
+	touch $@
