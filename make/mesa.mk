@@ -7,9 +7,8 @@ mesa-$(1):
 	cd mesa \
 	&& meson /tmp/build-mesa \
 	  -Dplatforms=x11,wayland \
-	  -Ddri-drivers=auto \
-	  -Dgallium-drivers=auto \
-	  -Dvulkan-drivers=auto \
+	  -Dgallium-drivers=radeonsi \
+	  -Dvulkan-drivers=amd \
 	  -Dglx=dri \
 	  -Degl=enabled \
 	  -Dgbm=enabled \
@@ -40,7 +39,7 @@ mesa-$(1)-$(2):
 	echo >>build-mesa/cross-$(1)-$(2).txt "ar = '$(1)-$(2)-ar'" && \
 	echo >>build-mesa/cross-$(1)-$(2).txt "windres = '$(1)-$(2)-windres'" && \
 	echo >>build-mesa/cross-$(1)-$(2).txt "strip = '$(1)-$(2)-strip'" && \
-	echo >>build-mesa/cross-$(1)-$(2).txt "pkgconfig = '$(1)-$(2)-pkg-config'" && \
+	echo >>build-mesa/cross-$(1)-$(2).txt "pkgconfig = 'pkg-config'" && \
 	echo >>build-mesa/cross-$(1)-$(2).txt "" && \
 	echo >>build-mesa/cross-$(1)-$(2).txt "[properties]" && \
 	echo >>build-mesa/cross-$(1)-$(2).txt "needs_exe_wrapper = true" && \
@@ -53,7 +52,7 @@ mesa-$(1)-$(2):
 	echo >>build-mesa/cross-$(1)-$(2).txt "cpu_family = '$$(MESON_CPU_$(1))'" && \
 	echo >>build-mesa/cross-$(1)-$(2).txt "cpu = '$$(MESON_CPU_x86_$(1))'" && \
 	echo >>build-mesa/cross-$(1)-$(2).txt "endian = 'little'" && \
-	env PKG_CONFIG_PATH=$(HOME)/.local/lib/$(1)-$(2)/pkgconfig \
+	env PKG_CONFIG_LIBDIR=$(HOME)/.local/lib/$(1)-$(2)/pkgconfig \
 	    PATH=$(HOME)/.local/$(1)-linux-gnu/bin:$(PATH) \
 	meson build-mesa/$(1)-$(2) mesa \
 	  --cross-file build-mesa/cross-$(1)-$(2).txt \

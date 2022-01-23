@@ -19,7 +19,7 @@ endef
 $(eval $(call vulkan-tools-build,i686))
 $(eval $(call vulkan-tools-build,x86_64))
 
-vulkan-tools: vulkan-tools-x86_64
+vulkan-tools: vulkan-tools-i686
 
 
 

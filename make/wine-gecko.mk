@@ -13,16 +13,16 @@ wine-gecko-$(1)-$(2):
 	+env SHELL=/bin/sh MOZCONFIG="$$(OBJ$(1))/mozconfig" \
 	$$(MAKE) -j$$(J) $$(MFLAGS) $$(MAKEOVERRIDES) -C $$(OBJ$(1))
 
-	find $$(OBJ$(1))/dist/firefox -type f '(' -iname '*.dll' -or -iname '*.exe' ')' -delete
+	-find $$(OBJ$(1))/dist/firefox -type f '(' -iname '*.dll' -or -iname '*.exe' ')' -delete
 	+env SHELL=/bin/sh MOZCONFIG="$$(OBJ$(1))/mozconfig" \
 	$$(MAKE) -j$$(J) $$(MFLAGS) $$(MAKEOVERRIDES) -C $$(OBJ$(1))/browser/installer stage-package
 
 	find $$(OBJ$(1))/dist/firefox -type f '(' -iname '*.dll' -or -iname '*.exe' ')' \
 	    -printf '%p\0%p.debug\0' | \
-	    xargs $(--verbose?) -0 -r -P$$(J) -n2 objcopy --file-alignment=4096 --only-keep-debug
+	    xargs $(--verbose?) -0 -r -P$$(J) -n2 $(1)-$(2)-objcopy --file-alignment=4096 --only-keep-debug
 	find $$(OBJ$(1))/dist/firefox -type f '(' -iname '*.dll' -or -iname '*.exe' ')' \
 	    -printf '--add-gnu-debuglink=%p.debug\0%p\0' | \
-	    xargs $(--verbose?) -0 -r -P$$(J) -n2 objcopy --file-alignment=4096 --strip-debug
+	    xargs $(--verbose?) -0 -r -P$$(J) -n2 $(1)-$(2)-objcopy --file-alignment=4096 --strip-debug
 
 .PHONY: wine-gecko-$(1)-$(2)
 

@@ -58,3 +58,8 @@ include make/ghidra.mk
 include make/tests.mk
 include make/nlopt.mk
 include make/dlib.mk
+include make/valgrind.mk
+include make/gamescope.mk
+include make/mono.mk
+include make/gpuvis.mk
+include make/mesa-demos.mk

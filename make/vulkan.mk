@@ -2,14 +2,14 @@ include make/common.mk
 
 # CMAKE_SYSTEM_NAME_linux-gnu = Linux
 CMAKE_SYSTEM_NAME_w64-mingw32 = Windows
-CMAKE_C_FLAGS_w64-mingw32 = -DWINVER=0x0A00 -D_WIN32_WINNT=0x0A00 -Wl,--add-stdcall-alias
-CMAKE_CXX_FLAGS_w64-mingw32 = -DWINVER=0x0A00 -D_WIN32_WINNT=0x0A00 -Wl,--add-stdcall-alias
+CMAKE_C_FLAGS_w64-mingw32 = -DWINVER=0x0A00 -D_WIN32_WINNT=0x0A00
+CMAKE_CXX_FLAGS_w64-mingw32 = -DWINVER=0x0A00 -D_WIN32_WINNT=0x0A00
 
 define vulkan-build
 vulkan: vulkan-$(1)-$(2)
 vulkan-$(1)-$(2): SHELL := $(SHELL_$(1))
 vulkan-$(1)-$(2):
-	cmake -B/tmp/build-vulkan -Hvulkan \
+	cmake -Bbuild-vulkan/$(1)-$(2) -Hvulkan \
 	  -DCMAKE_BUILD_TYPE=Release \
 	  -DCMAKE_C_COMPILER=$(1)-$(2)-gcc \
 	  -DCMAKE_CXX_COMPILER=$(1)-$(2)-g++ \
@@ -20,7 +20,7 @@ vulkan-$(1)-$(2):
 	  -DCMAKE_INSTALL_LIBDIR=lib/$(1)-$(2) \
 	  -DCMAKE_INSTALL_BINDIR=$(1)-$(2)/bin \
 	  -DBUILD_LAYER_SUPPORT_FILES=ON \
-	&& $(MAKE) -j$(shell nproc) -C /tmp/build-vulkan install VERBOSE=1
+	&& $$(MAKE) -j$$(J) -C build-vulkan/$(1)-$(2) install VERBOSE=1 DESTDIR=$$$$PWD/build-vulkan/$(1)-$(2)/install
 .PHONY: vulkan-$(1)-$(2)
 endef
 
