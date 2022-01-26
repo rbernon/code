@@ -1,0 +1,23 @@
+#!/bin/bash
+# GIT_EDITOR / GIT_SEQUENCE_EDITOR wrapper for preprocessing
+
+# prefixes and suffixes separated with /
+prefixes='wip|bug'
+suffixes='wip|bug|v[0-9]+.*$'
+
+case "$1" in
+    *"git-rebase-todo")
+        sed -re 's:([0-9]+)-([0-9]+):\1.\2:g' \
+            -re "/^label/{s:(tmp|$prefixes)-:\1/:g;s:-(tmp|$suffixes):/\1:g}" \
+            -re "/^reset/{s:(tmp|$prefixes)-:\1/:g;s:-(tmp|$suffixes):/\1:g}" \
+            -re "/^merge/{s:(tmp|$prefixes)-:\1/:g;s:-(tmp|$suffixes):/\1:g}" \
+            -re "/^label (onto|branch-point)/{p;d}; /^label .*($prefixes)\//{h;s:^label (.+)$:x git branch -f \1 HEAD:;x;p;x;}" \
+            -i "$@"
+        ;;
+    "/tmp/"*".patch")
+        sed -re '/CW-Bug-Id:/d' \
+            -i "$@"
+        ;;
+esac
+
+$EDITOR "$@"
