@@ -1,9 +1,0 @@
-#!/bin/bash
-# git push-all-branches
-
-pfx=("wip/*" "bug/*")
-
-if [[ "${2:-}" == */* ]]; then pfx=("${pfx[@]/#/${2%/*}/}"); fi
-
-git lmb "$2" | xargs git push "$1" -f "$2"
-git branch --list -r "${pfx[@]/#/$1/}" | cut -c3- | sed "s%^$1/%%" | grep -v -f <(git lmb "$2") | sed 's%^%:%' | xargs -r git push "$1"

@@ -1,8 +1,13 @@
 _marvin_ctl ()
 {
+    source /usr/share/bash-completion/bash_completion
+    _init_completion -n = || return
+
     case "$COMP_CWORD" in
     "0"|"1") COMPREPLY=($(compgen -W "login deb win all" -- "${COMP_WORDS[COMP_CWORD]}"));;
-    *) COMPREPLY=($(compgen -f -- "${COMP_WORDS[COMP_CWORD]}"));;
+    *) _filedir;;
     esac
+
+    return 0
 }
 complete -o default -F _marvin_ctl marvin-ctl

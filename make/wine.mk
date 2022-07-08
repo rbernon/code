@@ -35,12 +35,12 @@ DOCKER_SHELL = docker run --rm -e HOME -e USER -e USERID=$(shell id -u) -u $(she
                  -e CCACHE_COMPILERCHECK=none \
                  $(DOCKER_IMAGE_$(1)) $(SHELL)
 
-DOCKER_IMAGE_32 = rbernon/wine-i686:stable
-DOCKER_IMAGE_64 = rbernon/wine-x86_64:stable
+DOCKER_IMAGE_32 = rbernon/wine-i686:experimental
+DOCKER_IMAGE_64 = rbernon/wine-x86_64:experimental
 
 CONFIGURE_OPTS ?= --with-mingw CROSSDEBUG=split
-CONFIGURE_OPTS_64 ?= --enable-win64
-CONFIGURE_OPTS_32 ?=
+CONFIGURE_OPTS_64 ?= --host x86_64-linux-gnu PKG_CONFIG=pkg-config --enable-win64
+CONFIGURE_OPTS_32 ?= --host i686-linux-gnu PKG_CONFIG=pkg-config
 # --with-wine64=$(OBJ)/wine64
 
 CFLAGS ?= -O2 -ggdb -ffunction-sections -fdata-sections -fno-omit-frame-pointer
@@ -57,10 +57,9 @@ endif
 ifeq ($(lastword $(subst /, ,$(OBJ))),build-wine-llvm)
 DOCKER_IMAGE_32 = rbernon/wine-llvm-i686:experimental
 DOCKER_IMAGE_64 = rbernon/wine-llvm-x86_64:experimental
+CFLAGS += -Wno-ignored-attributes -Wno-format
 # CONFIGURE_OPTS += DELAYLOADFLAG=-Wl,-delayload, CROSSDEBUG=pdb
 # CROSSCFLAGS += -Wno-pragma-pack -gcodeview
-else
-CFLAGS += -Wno-misleading-indentation -Wno-array-bounds -Wno-sizeof-array-div -Wno-maybe-uninitialized
 endif
 
 ARCH_32 = i386-linux-gnu
@@ -94,7 +93,7 @@ $(WINE_SRC)/server/trace.c: $(WINE)/server/protocol.def | $(OBJ)/.wine-source
 	touch $@
 
 $(WINE_SRC)/dlls/winevulkan/vulkan_thunks.c: $(WINE)/dlls/winevulkan/make_vulkan | $(OBJ)/.wine-source
-	cd $(WINE_SRC) && dlls/winevulkan/make_vulkan
+	# cd $(WINE_SRC) && dlls/winevulkan/make_vulkan 2>/dev/null
 	touch $@
 
 $(OBJ)/.wine-post-source: $(WINE_SRC)/dlls/winevulkan/vulkan_thunks.c
@@ -109,22 +108,23 @@ wine$(1)/Makefile: private SHELL := $(DOCKER_SHELL)
 wine$(1)/Makefile: $$(shell mkdir -p wine$(1)) | $$(WINE_SRC)/configure
 	env -C wine$(1) CCACHE_BASEDIR=$$(abspath $$(WINE_SRC)) PATH=/usr/lib/ccache:/usr/bin:/bin \
 	$$(WINE_SRC)/configure $(--quiet?) -C \
-	                CFLAGS="$(strip $(CFLAGS))" CROSSCFLAGS="$(strip $(CFLAGS) $(CROSSCFLAGS))" \
+	                CFLAGS="$(strip $(CFLAGS) $(CFLAGS$(1)))" CROSSCFLAGS="$(strip $(CFLAGS) $(CFLAGS$(1)) $(CROSSCFLAGS))" \
 	                LDFLAGS="$(strip $(LDFLAGS))" CROSSLDFLAGS="$(strip $(LDFLAGS) $(CROSSLDFLAGS) $(CROSSLDFLAGS_$(1)))" \
 	                $(CONFIGURE_OPTS) $(CONFIGURE_OPTS_$(1)) && \
-	(touch $$@ 2>/dev/null||:)
+	touch $$@
 
 .wine-config$(1): wine$(1)/Makefile
-	(touch $$@ 2>/dev/null||:)
+	touch $$@
+.wine-config: .wine-config$(1)
 
 .wine-build$(1): private SHELL := $(DOCKER_SHELL)
-.wine-build$(1): .wine-config$(1) wine-source
+.wine-build$(1): .wine-config wine-source
 	+env -C wine$(1) CCACHE_BASEDIR=$$(abspath $$(WINE_SRC)) PATH=/usr/lib/ccache:/usr/bin:/bin \
 	$$(MAKE) $$(JFLAGS) $$(MFLAGS) $$(MAKEOVERRIDES) $(targets) && \
-	(touch $$@ 2>/dev/null||:)
+	touch $$@
 
 wine$(1): .wine-build$(1)
-.PHONY: wine$(1)
+.INTERMEDIATE: wine$(1)
 
 install$(1): private SHELL := $(DOCKER_SHELL)
 install$(1): wine$(1)
@@ -138,11 +138,16 @@ endef
 $(eval $(call create-build-rules,32))
 $(eval $(call create-build-rules,64))
 
+.wine-config:
+	env -C .. python3 compile_commands.py proton
+	env -C .. python3 compile_commands.py $(subst build-,,$(lastword $(subst /, ,$(OBJ))))
+	touch $@
+
 .wine-config32: .wine-config64
 .wine-build32: .wine-build64
-
 wine32: wine64
-wine: wine32 wine64
+
+.wine-build: .wine-build32 .wine-build64
 	-rm -f {wine32,wine64}/{wine,wine64}
 	-rm -f {wine32,wine64}/{fonts,nls}/*
 	-rm -f {wine32,wine64}/loader/{wine,wine64}{,-preloader}
@@ -158,36 +163,38 @@ wine: wine32 wine64
 	-ln -sf ../../wine64/loader/wine64-preloader wine32/loader/wine64-preloader
 	-ln -sf ../../wine32/loader/wine wine64/loader/wine
 	-ln -sf ../../wine32/loader/wine-preloader wine64/loader/wine-preloader
-	cd .. && python3 compile_commands.py
+	touch $@
+
+wine: .wine-build
+.INTERMEDIATE: wine
 
 install64: install32
 install: install32 install64
 
 ifeq ($(MAKELEVEL),0)
 
-ifneq ($(DISPLAY),)
 test-init: wine
-	Xephyr -sw-cursor -br -ac -glamor -screen 1280x720 $(D) & sleep 1
-	env DISPLAY=$(D) fvwm 2>/dev/null &
-#	env DISPLAY=$(D) metacity --no-composite --sm-disable 2>/dev/null &
-#	env DISPLAY=$(D) setxkbmap us
-# 	env DISPLAY=$(D) openbox --sm-disable 2>/dev/null &
-else
-test-init: wine
-endif
-
+test-done: test-exec
 test-exec: test-init
 	+$(MAKE) -f $(firstword $(MAKEFILE_LIST)) $(MAKECMDGOALS) DISPLAY=$(D) || (killall Xephyr; exit 1)
 
 ifneq ($(DISPLAY),)
-test-fini: test-exec
-	killall Xephyr
-else
-test-fini: test-exec
+test-init:
+	Xephyr -sw-cursor -br -ac -glamor -screen 1280x720 $(D) & sleep 1
+	env DISPLAY=$(D) setxkbmap fr
+	env DISPLAY=$(D) fvwm 2>/dev/null &
+#	env DISPLAY=$(D) openbox --sm-disable &
+#	env DISPLAY=$(D) mutter --sm-disable &
+#	env DISPLAY=$(D) metacity --no-composite --sm-disable 2>/dev/null &
 endif
 
-%.ok %/tests/check: D=$(patsubst :%,:9,$(DISPLAY))
-%.ok %/tests/check: test-init test-exec test-fini
+ifneq ($(DISPLAY),)
+test-done: test-exec
+	killall Xephyr
+endif
+
+%.ok %/tests/check: D=:99
+%.ok %/tests/check: test-done
 	echo $@ done
 
 else
@@ -198,6 +205,7 @@ make-test = $(word 1,$(subst /, ,$(1)))$(filter-out :check,$(patsubst %.ok,%,:$(
 WINETESTS := $(foreach f,$(filter %/check,$(MAKECMDGOALS)) $(filter %.ok,$(MAKECMDGOALS)),$(call make-test,$(f)))
 
 tests/win32: export WINE=$(CURDIR)/wine32/wine
+tests/win32: export WINEDLLOVERRIDES=winedbg.exe=d
 tests/win32: export WINEARCH=win32
 tests/win32: export WINEPREFIX=$(CURDIR)/winetest/win32
 tests/win32: export WINESERVER=$(CURDIR)/wine32/server/wineserver
@@ -208,6 +216,7 @@ tests/win32:
 	-grep "Test failed" $(WINEPREFIX).report
 
 tests/wow32: export WINE=$(CURDIR)/wine32/wine
+tests/wow32: export WINEDLLOVERRIDES=winedbg.exe=d
 tests/wow32: export WINEARCH=win64
 tests/wow32: export WINEPREFIX=$(CURDIR)/winetest/wow32
 tests/wow32: export WINESERVER=$(CURDIR)/wine64/server/wineserver
@@ -218,6 +227,7 @@ tests/wow32:
 	-grep "Test failed" $(WINEPREFIX).report
 
 tests/wow64: export WINE=$(CURDIR)/wine64/wine
+tests/wow64: export WINEDLLOVERRIDES=winedbg.exe=d
 tests/wow64: export WINEARCH=win64
 tests/wow64: export WINEPREFIX=$(CURDIR)/winetest/wow64
 tests/wow64: export WINESERVER=$(CURDIR)/wine64/server/wineserver
@@ -238,6 +248,7 @@ tests/wow64:
 else
 
 %/tests/check: export WINEPREFIX=$(HOME)/.wine-test
+%/tests/check: export WINEDLLOVERRIDES=winedbg.exe=d
 %/tests/check:
 	-wine64/wine wineboot -u
 	$(MAKE) -C wine32 dlls/$@ $(TESTFLAGS)
@@ -245,6 +256,7 @@ else
 .PHONY: %/tests/check
 
 %.ok: export WINEPREFIX=$(HOME)/.wine-test
+%.ok: export WINEDLLOVERRIDES=winedbg.exe=d
 %.ok:
 	rm -rf $(WINEPREFIX) && mkdir -p $(WINEPREFIX)
 	-wine64/server/wineserver

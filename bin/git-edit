@@ -2,8 +2,8 @@
 # GIT_EDITOR / GIT_SEQUENCE_EDITOR wrapper for preprocessing
 
 # prefixes and suffixes separated with /
-prefixes='wip|bug'
-suffixes='wip|bug|v[0-9]+.*$'
+prefixes='wip|bug|mr'
+suffixes='wip|bug|mr|v[0-9]+.*$'
 
 case "$1" in
     *"git-rebase-todo")
@@ -12,6 +12,7 @@ case "$1" in
             -re "/^reset/{s:(tmp|$prefixes)-:\1/:g;s:-(tmp|$suffixes):/\1:g}" \
             -re "/^merge/{s:(tmp|$prefixes)-:\1/:g;s:-(tmp|$suffixes):/\1:g}" \
             -re "/^label (onto|branch-point)/{p;d}; /^label .*($prefixes)\//{h;s:^label (.+)$:x git branch -f \1 HEAD:;x;p;x;}" \
+            ${GIT_EDIT_POST_EXEC:+-re "/^$/{s%$%\n$GIT_EDIT_POST_EXEC%;q}"} \
             -i "$@"
         ;;
     "/tmp/"*".patch")

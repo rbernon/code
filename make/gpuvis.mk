@@ -5,7 +5,7 @@ gpuvis:: gpuvis-$(1)
 gpuvis-$(1): SHELL := $(SHELL_$(1))
 gpuvis-$(1):
 	env PATH=$(HOME)/.local/$(1)-linux-gnu/bin:$(PATH) \
-	meson build-gpuvis/$(1) gpuvis \
+	meson build-gpuvis/$(1) gpuvis -Duse_gtk3=false \
 	&& ninja -C build-gpuvis/$(1)
 endef
 

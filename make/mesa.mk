@@ -7,8 +7,9 @@ mesa-$(1):
 	cd mesa \
 	&& meson /tmp/build-mesa \
 	  -Dplatforms=x11,wayland \
-	  -Dgallium-drivers=radeonsi \
-	  -Dvulkan-drivers=amd \
+	  -Dgallium-drivers=radeonsi,i915,virgl,swrast \
+	  -Dvulkan-drivers=amd,intel,swrast \
+	  -Dgallium-va=true \
 	  -Dglx=dri \
 	  -Degl=enabled \
 	  -Dgbm=enabled \

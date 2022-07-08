@@ -21,9 +21,9 @@
 """
 Usage:
   marvin-ctl [options] login <username>
-  marvin-ctl [options] deb <patch> [<cmdline>...]
-  marvin-ctl [options] win <patch> [<cmdline>...]
-  marvin-ctl [options] all <patch> [<cmdline>...]
+  marvin-ctl [options] deb <patch> [--] [<cmdline>...]
+  marvin-ctl [options] win <patch> [--] [<cmdline>...]
+  marvin-ctl [options] all <patch> [--] [<cmdline>...]
 
 Commands:
   login <username>            Login to Marvin
@@ -33,9 +33,11 @@ Commands:
 
 Options:
   -V, --vms <vm>[,<vm>...]  Explicit VM list
-  -l, --lang                Run on localized VMs
+  -l, --lang <locale>       Run on localized VMs [default: en_US]
   -e, --extra               Run on extra VMs
   -d, --driver              Run on test signed driver VMs
+  -t, --test <test>         Run this test instead of detecting it
+  --debug <debug>           Set winetest debug level [default: 1]
   --32                      Choose 32 bit Windows only
   --64                      Choose 64 bit Windows only
   -1, --one                 Choose just one Windows VM
@@ -51,55 +53,57 @@ import pickle
 import sys
 import os
 
+LOCALES = ['ar_MA', 'de_DE', 'el_GR', 'en_US', 'es_ES', 'fr_FR', 'he_IL', 'hi_IN', 'ja_JP', 'ko_KR', 'pt_BR', 'pt_PT', 'ru_RU', 'zh_CN']
+
 VMS = {
-  'debian11':         { 'type': 'deb',   'default': True,  'driver': True,  'locale': True  },
-  'debiant':          { 'type': 'deb',   'default': False, 'driver': True,  'locale': True  },
-  'debiant2':         { 'type': 'deb',   'default': False, 'driver': True,  'locale': True  },
+  'debian11':         { 'type': 'deb',   'default': True,  'driver': True,  'locales': LOCALES },
+  'debiant':          { 'type': 'deb',   'default': False, 'driver': True,  'locales': LOCALES },
+  'debiant2':         { 'type': 'deb',   'default': False, 'driver': True,  'locales': LOCALES },
 
-  'w1064_tsign':      { 'type': 'win64', 'default': True,  'driver': True,  'locale': False },
-  'w1064':            { 'type': 'win64', 'default': True,  'driver': False, 'locale': False },
-  'w1064_2qxl':       { 'type': 'win64', 'default': True,  'driver': False, 'locale': False },
-  'w1064v1507':       { 'type': 'win64', 'default': True,  'driver': False, 'locale': False },
-  'w1064v1809':       { 'type': 'win64', 'default': True,  'driver': False, 'locale': False },
-  'w10pro64':         { 'type': 'win64', 'default': True,  'driver': False, 'locale': False },
-  'w864':             { 'type': 'win64', 'default': True,  'driver': False, 'locale': False },
-  'w10pro64_ar':      { 'type': 'win64', 'default': True,  'driver': False, 'locale': True  },
-  'w10pro64_he':      { 'type': 'win64', 'default': True,  'driver': False, 'locale': True  },
-  'w10pro64_ja':      { 'type': 'win64', 'default': True,  'driver': False, 'locale': True  },
-  'w10pro64_zh_CN':   { 'type': 'win64', 'default': True,  'driver': False, 'locale': True  },
-  'w1064_1qxl':       { 'type': 'win64', 'default': False, 'driver': False, 'locale': False },
-  'w1064_adm':        { 'type': 'win64', 'default': False, 'driver': False, 'locale': False },
-  'w1064v1607':       { 'type': 'win64', 'default': False, 'driver': False, 'locale': False },
-  'w1064v1709':       { 'type': 'win64', 'default': False, 'driver': False, 'locale': False },
-  'w1064v1909':       { 'type': 'win64', 'default': False, 'driver': False, 'locale': False },
-  'w10pro64_de':      { 'type': 'win64', 'default': False, 'driver': False, 'locale': True  },
-  'w10pro64_fr':      { 'type': 'win64', 'default': False, 'driver': False, 'locale': True  },
-  'w10pro64_hi':      { 'type': 'win64', 'default': False, 'driver': False, 'locale': True  },
-  'w10pro64_ko':      { 'type': 'win64', 'default': False, 'driver': False, 'locale': True  },
-  'w10pro64_pt_BR':   { 'type': 'win64', 'default': False, 'driver': False, 'locale': True  },
-  'w10pro64_pt_PT':   { 'type': 'win64', 'default': False, 'driver': False, 'locale': True  },
-  'w10pro64_ru':      { 'type': 'win64', 'default': False, 'driver': False, 'locale': True  },
-  'w10pro64v2004':    { 'type': 'win64', 'default': False, 'driver': False, 'locale': False },
-  'w2008s64':         { 'type': 'win64', 'default': False, 'driver': False, 'locale': False },
-  'w7pro64':          { 'type': 'win64', 'default': False, 'driver': False, 'locale': False },
-  'wvistau64':        { 'type': 'win64', 'default': False, 'driver': False, 'locale': False },
+  'w1064_tsign':      { 'type': 'win64', 'default': True,  'driver': True,  'locales': ['en_US'] },
+  'w1064':            { 'type': 'win64', 'default': True,  'driver': False, 'locales': ['en_US'] },
+  'w1064_2qxl':       { 'type': 'win64', 'default': True,  'driver': False, 'locales': ['en_US'] },
+  'w1064v1507':       { 'type': 'win64', 'default': True,  'driver': False, 'locales': ['en_US'] },
+  'w1064v1809':       { 'type': 'win64', 'default': True,  'driver': False, 'locales': ['en_US'] },
+  'w10pro64':         { 'type': 'win64', 'default': True,  'driver': False, 'locales': ['en_US'] },
+  'w864':             { 'type': 'win64', 'default': True,  'driver': False, 'locales': ['en_US'] },
+  'w10pro64_ar':      { 'type': 'win64', 'default': True,  'driver': False, 'locales': ['ar_MA'] },
+  'w10pro64_he':      { 'type': 'win64', 'default': True,  'driver': False, 'locales': ['he_IL'] },
+  'w10pro64_ja':      { 'type': 'win64', 'default': True,  'driver': False, 'locales': ['ja_JP'] },
+  'w10pro64_zh_CN':   { 'type': 'win64', 'default': True,  'driver': False, 'locales': ['zh_CN'] },
+  'w1064_1qxl':       { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['en_US'] },
+  'w1064_adm':        { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['en_US'] },
+  'w1064v1607':       { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['en_US'] },
+  'w1064v1709':       { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['en_US'] },
+  'w1064v1909':       { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['en_US'] },
+  'w10pro64_de':      { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['de_DE'] },
+  'w10pro64_fr':      { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['fr_FR'] },
+  'w10pro64_hi':      { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['hi_IN'] },
+  'w10pro64_ko':      { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['ko_KR'] },
+  'w10pro64_pt_BR':   { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['pt_BR'] },
+  'w10pro64_pt_PT':   { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['pt_PT'] },
+  'w10pro64_ru':      { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['ru_RU'] },
+  'w10pro64v2004':    { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['en_US'] },
+  'w2008s64':         { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['en_US'] },
+  'w7pro64':          { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['en_US'] },
+  'wvistau64':        { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['en_US'] },
 
-  'w7u_2qxl':         { 'type': 'win32', 'default': True,  'driver': True,  'locale': False },
-  'w8':               { 'type': 'win32', 'default': True,  'driver': True,  'locale': False },
-  'w7u_adm':          { 'type': 'win32', 'default': True,  'driver': False, 'locale': False },
-  'w8adm':            { 'type': 'win32', 'default': True,  'driver': False, 'locale': False },
-  'w7u_el':           { 'type': 'win32', 'default': True,  'driver': False, 'locale': True  },
-  'w2000pro':         { 'type': 'win32', 'default': False, 'driver': False, 'locale': False },
-  'w2003std':         { 'type': 'win32', 'default': False, 'driver': False, 'locale': False },
-  'w7u':              { 'type': 'win32', 'default': False, 'driver': False, 'locale': False },
-  'w7u_1qxl':         { 'type': 'win32', 'default': False, 'driver': False, 'locale': False },
-  'w7u_de':           { 'type': 'win32', 'default': False, 'driver': False, 'locale': True  },
-  'w7u_es':           { 'type': 'win32', 'default': False, 'driver': False, 'locale': True  },
-  'w7u_pt_PT':        { 'type': 'win32', 'default': False, 'driver': False, 'locale': True  },
-  'wvista':           { 'type': 'win32', 'default': False, 'driver': False, 'locale': False },
-  'wvistaadm':        { 'type': 'win32', 'default': False, 'driver': False, 'locale': False },
-  'wxppro':           { 'type': 'win32', 'default': False, 'driver': False, 'locale': False },
-  'wxppro_2scr':      { 'type': 'win32', 'default': False, 'driver': False, 'locale': False },
+  'w7u_2qxl':         { 'type': 'win32', 'default': True,  'driver': True,  'locales': ['en_US'] },
+  'w8':               { 'type': 'win32', 'default': True,  'driver': True,  'locales': ['en_US'] },
+  'w7u_adm':          { 'type': 'win32', 'default': True,  'driver': False, 'locales': ['en_US'] },
+  'w8adm':            { 'type': 'win32', 'default': True,  'driver': False, 'locales': ['en_US'] },
+  'w7u_el':           { 'type': 'win32', 'default': True,  'driver': True,  'locales': ['el_GR'] },
+  'w2000pro':         { 'type': 'win32', 'default': False, 'driver': False, 'locales': ['en_US'] },
+  'w2003std':         { 'type': 'win32', 'default': False, 'driver': False, 'locales': ['en_US'] },
+  'w7u':              { 'type': 'win32', 'default': False, 'driver': True,  'locales': ['en_US'] },
+  'w7u_1qxl':         { 'type': 'win32', 'default': False, 'driver': False, 'locales': ['en_US'] },
+  'w7u_de':           { 'type': 'win32', 'default': False, 'driver': True,  'locales': ['de_DE'] },
+  'w7u_es':           { 'type': 'win32', 'default': False, 'driver': True,  'locales': ['es_ES'] },
+  'w7u_pt_PT':        { 'type': 'win32', 'default': False, 'driver': True,  'locales': ['pt_PT'] },
+  'wvista':           { 'type': 'win32', 'default': False, 'driver': False, 'locales': ['en_US'] },
+  'wvistaadm':        { 'type': 'win32', 'default': False, 'driver': False, 'locales': ['en_US'] },
+  'wxppro':           { 'type': 'win32', 'default': False, 'driver': False, 'locales': ['en_US'] },
+  'wxppro_2scr':      { 'type': 'win32', 'default': False, 'driver': False, 'locales': ['en_US'] },
 }
 
 def run(args, session):
@@ -111,20 +115,41 @@ def run(args, session):
         'Remarks': '',
         'Run32': 'on',
         'Run64': 'on',
-        'DebugLevel': '1',
+        'DebugLevel': args['debug'],
         'Action': 'Submit',
     }
     files = {'Upload': open(args['<patch>'], 'rb')}
 
+    if args['lang'] != 'en_US': args['extra'] = True
+    if len(args['<cmdline>']) and args['<cmdline>'][0] == '--':
+        args['<cmdline>'] = args['<cmdline>'][1:]
     if args['<patch>'].endswith('.exe') and not args['64']:
         output = subprocess.check_output(['file', args['<patch>']],
                                          encoding='utf-8')
         args['64'] = 'PE32+' in output
 
+    if args['vms'] is not None:
+        vms = {k: v for k, v in VMS.items() if k in args['vms'].split(',')}
+    else: 
+        vms = {k: v for k, v in VMS.items()}
+        vms = {k: v for k, v in vms.items() if args['all'] or args[v['type'][:3]]}
+        vms = {k: v for k, v in vms.items() if v['default'] or args['extra'] or args['driver']}
+        vms = {k: v for k, v in vms.items() if args['lang'] in v['locales'] or args['driver']}
+        if args['driver']: vms = {k: v for k, v in vms.items() if v['driver']}
+        if args['32']: vms = {k: v for k, v in vms.items() if v['type'] != 'win64'}
+        if args['64']: vms = {k: v for k, v in vms.items() if v['type'] != 'win32'}
+        if args['one']: vms = {k: v for k, v in list(vms.items())[0:1]}
+    assert len(vms) > 0
+
     if args['<patch>'].endswith('.exe'):
         data['TestExecutable'] = os.path.basename(args['<patch>'])
         data['CmdLineArg'] = ' '.join(args['<cmdline>'])
         data['NoCmdLineArgWarn'] = '1'
+    elif args['test']:
+        assert len(args['<cmdline>']) > 0
+        data['CmdLineArg'] = ' '.join(args['<cmdline>'])
+        data['TestExecutable'] = f'{args["test"]}_test.exe'
+        print(f"Running {data['TestExecutable']} {data['CmdLineArg']} on {' '.join(vms.keys())}")
     else:
         assert len(args['<cmdline>']) > 0
         data['CmdLineArg'] = ' '.join(args['<cmdline>'])
@@ -133,35 +158,32 @@ def run(args, session):
                          'dlls' in l and 'tests' in l]:
                 split = line.strip().split("/")
                 data['TestExecutable'] = f'{split[2]}_test.exe'
-
-    if args['vms'] is None: vms = {k: v for k, v in VMS.items()}
-    else: vms = {k: v for k, v in VMS.items() if k in args['vms'].split(',')}
-    vms = {k: v for k, v in vms.items() if args['all'] or args[v['type'][:3]]}
-    vms = {k: v for k, v in vms.items() if v['default'] or args['extra']}
-    vms = {k: v for k, v in vms.items() if not v['locale'] or args['lang']}
-    if args['driver']: vms = {k: v for k, v in vms.items() if v['driver']}
-    if args['32']: vms = {k: v for k, v in vms.items() if v['type'] != 'win64'}
-    if args['64']: vms = {k: v for k, v in vms.items() if v['type'] != 'win32'}
-
-    print(f"Running {data['TestExecutable']}, {data['CmdLineArg']} on {' '.join(vms.keys())}")
+        print(f"Running {data['TestExecutable']} {data['CmdLineArg']} on {' '.join(vms.keys())}")
 
     for k, v in vms.items():
         if v['type'] == 'deb':
             if not args['64']:
                 data[f'win32_{k}'] = 'on'
-                data[f'win32_{k}_lang'] = 'en_US'
-                data[f'wow32_{k}'] = 'on'
-                data[f'wow32_{k}_lang'] = 'en_US'
-            if not args['32']:
+                data[f'win32_{k}_lang'] = args['lang']
+            if not args['<patch>'].endswith('.exe') or args['64']:
                 data[f'wow64_{k}'] = 'on'
-                data[f'wow64_{k}_lang'] = 'en_US'
+                data[f'wow64_{k}_lang'] = args['lang']
+            if not args['64']:
+                data[f'wow32_{k}'] = 'on'
+                data[f'wow32_{k}_lang'] = args['lang']
         else:
             data[f'vm_{k}'] = 'on'
+
+    if args['dry_run']:
+        print(args)
+        print(data)
+        return
 
     rep = session.post('https://testbot.winehq.org/Submit.pl',
                        data=data, files=files, allow_redirects=False)
     rep.raise_for_status()
-    print(rep.headers['Location'])
+    try: print(rep.headers['Location'])
+    except: print(rep.content)
 
 def login(args, session):
     data = {'Name': args['<username>'], 'Password': getpass.getpass(), 'Action': 'Log in'}
@@ -174,6 +196,7 @@ def main():
     args = docopt.docopt(__doc__, version='marvin-ctl v1.0.0')
     args = dict(((k if '--' not in k else k.strip('-').replace('-', '_'),v)
                for k,v in args.items()))
+    print(args)
 
     session = requests.Session()
     if args['login']:

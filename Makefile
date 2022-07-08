@@ -63,3 +63,5 @@ include make/gamescope.mk
 include make/mono.mk
 include make/gpuvis.mk
 include make/mesa-demos.mk
+include make/SDL.mk
+include make/libunwind.mk

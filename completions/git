@@ -1,0 +1,2 @@
+. /usr/share/bash-completion/completions/git
+for f in git-*; do . $f; done
