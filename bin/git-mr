@@ -6,5 +6,5 @@ base="${3:-$(git merge-base origin/master "winehq/mr/$1" || echo "origin/master"
 git switch --detach
 GIT_SEQUENCE_EDITOR="git edit" \
 GIT_EDIT_POST_EXEC="x git push winehq --dry-run -f "HEAD:refs/heads/mr/$1"" \
-git rebase --signoff --interactive --onto "$base" "$(echo "$2"|sed -e "s/^-/HEAD~/")" HEAD
+git rebase --interactive --onto "$base" "$(echo "$2"|sed -e "s/^-/HEAD~/")" HEAD
 git switch -

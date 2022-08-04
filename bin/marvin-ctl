@@ -196,7 +196,6 @@ def main():
     args = docopt.docopt(__doc__, version='marvin-ctl v1.0.0')
     args = dict(((k if '--' not in k else k.strip('-').replace('-', '_'),v)
                for k,v in args.items()))
-    print(args)
 
     session = requests.Session()
     if args['login']:
