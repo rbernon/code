@@ -9,12 +9,12 @@ mesa-$(1):
 	  -Dplatforms=x11,wayland \
 	  -Dgallium-drivers=radeonsi,i915,virgl,swrast \
 	  -Dvulkan-drivers=amd,intel,swrast \
-	  -Dgallium-va=true \
+	  -Dgallium-va=enabled \
 	  -Dglx=dri \
 	  -Degl=enabled \
 	  -Dgbm=enabled \
 	  -Dopengl=true \
-	  -Dlmsensors=false \
+	  -Dlmsensors=disabled \
 	  -Dllvm=enabled \
 	  -Dprefix=$(HOME)/.local \
 	  -Dlibdir=lib/$(1)-linux-gnu \
