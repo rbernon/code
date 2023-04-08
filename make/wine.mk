@@ -271,9 +271,11 @@ else
 	$(MAKE) -C build32 $(foreach f,$(subst tests,.*,$(MAKECMDGOALS)),$(subst :, ,$(firstword $(shell grep $(f) build32/Makefile))))
 endif
 
+tests: export WAYLAND_DISPLAY=wayland-1
 tests: export WINED3D_CONFIG=csmt=0
 tests: export LP_NUM_THREADS=0
 tests: export DISPLAY=:0
+tests: export LC_ALL=$(WINELANG)
 ifeq ($(TESTEXE),)
 tests: tests/win32 tests/win64 # tests/wow64
 else
