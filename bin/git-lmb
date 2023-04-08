@@ -7,4 +7,4 @@ if [[ "${1:-}" == "-v" ]]; then v=-v; shift; else v=; fi
 if [[ "${1:-}" == */* ]]; then pfx=("${pfx[@]/#/${1%/*}/}"); fi
 
 if [[ "x$v" == "x" ]]; then echo "${pfx[0]/experimental/master}"; fi
-git branch --list "${pfx[@]}" | grep $v -f <(git branch --merged "${1:-master}" | sed 's:^:^:;s:$:$:') | cut -c3-
+git branch --list "${pfx[@]}" | grep $v -f <(for b in "${@:-master}"; do git branch --merged "$b"; done | sed 's:^:^:;s:$:$:') | cut -c3-
