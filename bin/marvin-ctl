@@ -50,22 +50,26 @@ import requests
 import getpass
 import docopt
 import pickle
+import shutil
 import sys
 import os
 
-LOCALES = ['ar_MA', 'de_DE', 'el_GR', 'en_US', 'es_ES', 'fr_FR', 'he_IL', 'hi_IN', 'ja_JP', 'ko_KR', 'pt_BR', 'pt_PT', 'ru_RU', 'zh_CN']
+LOCALES = ['ar_MA', 'de_DE', 'el_GR', 'en_US', 'en_AE', 'es_ES', 'fr_FR', 'he_IL', 'hi_IN', 'ja_JP', 'ko_KR', 'mx_MX', 'pt_BR', 'pt_PT', 'ru_RU', 'zh_CN']
 
 VMS = {
   'debian11':         { 'type': 'deb',   'default': True,  'driver': True,  'locales': LOCALES },
   'debiant':          { 'type': 'deb',   'default': False, 'driver': True,  'locales': LOCALES },
-  'debiant2':         { 'type': 'deb',   'default': False, 'driver': True,  'locales': LOCALES },
+  'debiant11b':       { 'type': 'deb',   'default': False, 'driver': True,  'locales': LOCALES },
 
   'w1064_tsign':      { 'type': 'win64', 'default': True,  'driver': True,  'locales': ['en_US'] },
+  'w864_tsign':       { 'type': 'win64', 'default': True,  'driver': True,  'locales': ['en_US'] },
+  'w7u_tsign':        { 'type': 'win32', 'default': True,  'driver': True,  'locales': ['en_US'] },
   'w1064':            { 'type': 'win64', 'default': True,  'driver': False, 'locales': ['en_US'] },
   'w1064_2qxl':       { 'type': 'win64', 'default': True,  'driver': False, 'locales': ['en_US'] },
   'w1064v1507':       { 'type': 'win64', 'default': True,  'driver': False, 'locales': ['en_US'] },
   'w1064v1809':       { 'type': 'win64', 'default': True,  'driver': False, 'locales': ['en_US'] },
   'w10pro64':         { 'type': 'win64', 'default': True,  'driver': False, 'locales': ['en_US'] },
+  'w11pro64':         { 'type': 'win64', 'default': True,  'driver': False, 'locales': ['en_US'] },
   'w864':             { 'type': 'win64', 'default': True,  'driver': False, 'locales': ['en_US'] },
   'w10pro64_ar':      { 'type': 'win64', 'default': True,  'driver': False, 'locales': ['ar_MA'] },
   'w10pro64_he':      { 'type': 'win64', 'default': True,  'driver': False, 'locales': ['he_IL'] },
@@ -76,10 +80,17 @@ VMS = {
   'w1064v1607':       { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['en_US'] },
   'w1064v1709':       { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['en_US'] },
   'w1064v1909':       { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['en_US'] },
+  'w1064v2009':       { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['en_US'] },
+  'w1064v21h2':       { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['en_US'] },
+  'w11pro64_amd':     { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['en_US'] },
+  'w11pro64_nv':      { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['en_US'] },
+  'w11pro64_en_AE_u8':{ 'type': 'win64', 'default': False, 'driver': False, 'locales': ['en_AE'] },
   'w10pro64_de':      { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['de_DE'] },
   'w10pro64_fr':      { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['fr_FR'] },
   'w10pro64_hi':      { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['hi_IN'] },
+  'w10pro64_hi_u8':   { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['hi_IN'] },
   'w10pro64_ko':      { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['ko_KR'] },
+  'w10pro64_mx_MX':   { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['mx_MX'] },
   'w10pro64_pt_BR':   { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['pt_BR'] },
   'w10pro64_pt_PT':   { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['pt_PT'] },
   'w10pro64_ru':      { 'type': 'win64', 'default': False, 'driver': False, 'locales': ['ru_RU'] },
@@ -95,7 +106,7 @@ VMS = {
   'w7u_el':           { 'type': 'win32', 'default': True,  'driver': True,  'locales': ['el_GR'] },
   'w2000pro':         { 'type': 'win32', 'default': False, 'driver': False, 'locales': ['en_US'] },
   'w2003std':         { 'type': 'win32', 'default': False, 'driver': False, 'locales': ['en_US'] },
-  'w7u':              { 'type': 'win32', 'default': False, 'driver': True,  'locales': ['en_US'] },
+  'w7u':              { 'type': 'win32', 'default': False, 'driver': False, 'locales': ['en_US'] },
   'w7u_1qxl':         { 'type': 'win32', 'default': False, 'driver': False, 'locales': ['en_US'] },
   'w7u_de':           { 'type': 'win32', 'default': False, 'driver': True,  'locales': ['de_DE'] },
   'w7u_es':           { 'type': 'win32', 'default': False, 'driver': True,  'locales': ['es_ES'] },
@@ -118,6 +129,17 @@ def run(args, session):
         'DebugLevel': args['debug'],
         'Action': 'Submit',
     }
+
+    if args['<patch>'].endswith('.exe'):
+        shutil.copy(args['<patch>'], 'test.exe')
+        args['<patch>'] = 'test.exe'
+    elif args['<patch>'][0] == '0' and '-' in args['<patch>']:
+        shutil.copy(args['<patch>'], args['<patch>'].split('-')[0] + '.patch')
+        args['<patch>'] = args['<patch>'].split('-')[0] + '.patch'
+    else:
+        shutil.copy(args['<patch>'], 'patch')
+        args['<patch>'] = 'patch'
+
     files = {'Upload': open(args['<patch>'], 'rb')}
 
     if args['lang'] != 'en_US': args['extra'] = True
@@ -177,13 +199,17 @@ def run(args, session):
     if args['dry_run']:
         print(args)
         print(data)
+        os.remove(args['<patch>'])
         return
 
     rep = session.post('https://testbot.winehq.org/Submit.pl',
                        data=data, files=files, allow_redirects=False)
+    os.remove(args['<patch>'])
+
     rep.raise_for_status()
-    try: print(rep.headers['Location'])
-    except: print(rep.content)
+    if 'Location' not in rep.headers: print(rep.content.decode('utf-8'))
+    elif 'localhost' in os.environ['DISPLAY']: print(rep.headers['Location'])
+    else: subprocess.run(['xdg-open', rep.headers['Location']])
 
 def login(args, session):
     data = {'Name': args['<username>'], 'Password': getpass.getpass(), 'Action': 'Log in'}
