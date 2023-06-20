@@ -10,6 +10,7 @@ mesa-$(1):
 	  -Dgallium-drivers=radeonsi,i915,virgl,swrast \
 	  -Dvulkan-drivers=amd,intel,swrast \
 	  -Dgallium-va=enabled \
+	  -Dvideo-codecs=vc1dec,h264dec,h264enc,h265dec,h265enc \
 	  -Dglx=dri \
 	  -Degl=enabled \
 	  -Dgbm=enabled \
