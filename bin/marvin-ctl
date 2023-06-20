@@ -21,12 +21,14 @@
 """
 Usage:
   marvin-ctl [options] login <username>
+  marvin-ctl [options] stats [--global]
   marvin-ctl [options] deb <patch> [--] [<cmdline>...]
   marvin-ctl [options] win <patch> [--] [<cmdline>...]
   marvin-ctl [options] all <patch> [--] [<cmdline>...]
 
 Commands:
   login <username>            Login to Marvin
+  stats [--global]            Show tests statistics
   deb <patch> [<cmdline>...]  Run tests on Debian
   win <patch> [<cmdline>...]  Run tests on Windows
   all <patch> [<cmdline>...]  Run tests on Debian and Windows
@@ -57,9 +59,10 @@ import os
 LOCALES = ['ar_MA', 'de_DE', 'el_GR', 'en_US', 'en_AE', 'es_ES', 'fr_FR', 'he_IL', 'hi_IN', 'ja_JP', 'ko_KR', 'mx_MX', 'pt_BR', 'pt_PT', 'ru_RU', 'zh_CN']
 
 VMS = {
-  'debian11':         { 'type': 'deb',   'default': True,  'driver': True,  'locales': LOCALES },
-  'debiant':          { 'type': 'deb',   'default': False, 'driver': True,  'locales': LOCALES },
+  'debian11b':        { 'type': 'deb',   'default': True,  'driver': True,  'locales': LOCALES },
+  'debian11':         { 'type': 'deb',   'default': False, 'driver': True,  'locales': LOCALES },
   'debiant11b':       { 'type': 'deb',   'default': False, 'driver': True,  'locales': LOCALES },
+  'debiant':          { 'type': 'deb',   'default': False, 'driver': True,  'locales': LOCALES },
 
   'w1064_tsign':      { 'type': 'win64', 'default': True,  'driver': True,  'locales': ['en_US'] },
   'w864_tsign':       { 'type': 'win64', 'default': True,  'driver': True,  'locales': ['en_US'] },
@@ -218,6 +221,48 @@ def login(args, session):
     with open(os.path.expanduser('~/.cache/marvinctl'), 'wb') as cookies:
         pickle.dump(session.cookies, cookies)
 
+def stats(args, session):
+    builds = {}
+
+    rep = session.get('https://test.winehq.org/data')
+    rep.raise_for_status()
+    for line in rep.content.decode('utf-8').split('\n'):
+        if 'td class="build"' not in line: continue
+        builds[line.split('"')[3]] = ''
+
+    stats = {}
+    print(builds)
+    for build in builds.keys():
+        rep = session.get(f'https://test.winehq.org/data/{build}/testresults.txt')
+        rep.raise_for_status()
+        for line in rep.content.decode('utf-8').split('\n'):
+            if len(line) == 0 or line[0] == '*': continue
+            test, src, tmp = (line + ' ').split(' ', 2)
+            results = {}
+
+            if not 'user32' in test: continue
+
+            for result in tmp.strip().split(' '):
+                tmp = result.split(':')
+                if tmp[0] in ('missingdll'): continue
+                for loc in tmp[1:]:
+                    if not loc.startswith(('linux_rbernon-x11-openbox', 'linux_rbernon-x11-fvwm', 'linux_rbernon-x11-desktop')): continue
+                    results[loc] = tmp[0]
+
+            if len(results) == 0: continue
+            print(build, test, src)
+            for k, v in results.items():
+                if k.endswith(('_1', '_2')): k = k[:-2]
+
+                if not k in stats: stats[k] = {'crash':0, 'error':0}
+                if v == 'crash': stats[k]['crash'] += 1
+                else: stats[k]['error'] += int(v)
+
+                print('  ', k, v)
+
+    for k, v in sorted(stats.items()):
+        print(k, v['error'], v['crash'])
+
 def main():
     args = docopt.docopt(__doc__, version='marvin-ctl v1.0.0')
     args = dict(((k if '--' not in k else k.strip('-').replace('-', '_'),v)
@@ -226,6 +271,8 @@ def main():
     session = requests.Session()
     if args['login']:
         login(args, session)
+    elif args['stats']:
+        stats(args, session)
     else:
         with open(os.path.expanduser('~/.cache/marvinctl'), 'rb') as cookies:
             session.cookies.update(pickle.load(cookies))
