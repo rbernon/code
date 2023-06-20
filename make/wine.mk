@@ -41,7 +41,7 @@ all: wine
 DOCKER_SHELL = docker run --rm -e HOME -e USER -e USERID=$(shell id -u) -u $(shell id -u):$(shell id -g) \
                  -v $(CURDIR)/.home:$(HOME) -v $(HOME)/.ccache:$(HOME)/.ccache -v $(HOME)/.cache:$(HOME)/.cache \
                  -v $(WINE_SRC):$(WINE_SRC) -v $(OBJ):$(OBJ) -v $(OBJ)/../make:$(OBJ)/../make -w $(OBJ) -e MAKEFLAGS \
-                 -e WINE -e WINEDLLOVERRIDES -e WINEARCH -e WINEPREFIX -e WINESERVER -e WINETEST -e WINEDEBUG \
+                 -e WINE -e WINEDLLOVERRIDES -e WINEARCH -e WINEPREFIX -e WINESERVER -e WINETEST -e WINETEST_DEBUG -e WINEDEBUG \
                  -e GST_DEBUG -e GST_DEBUG_NO_COLOR -e CCACHE_COMPILERCHECK=none -e LC_ALL=C.UTF-8 -e XDG_RUNTIME_DIR=$(HOME)/.local/run \
                  $(DOCKER_IMAGE) $(SHELL)
 ifeq ($(lastword $(subst /, ,$(OBJ))),build-wine-llvm)
@@ -91,6 +91,21 @@ tests: wine
 wine tests: any
 %.ok %/tests/check: any
 	echo $@ done
+
+make-valgrind = dlls/$(word 1,$(subst /, ,$(1)))/tests/$(2)/$(word 1,$(subst /, ,$(1)))_test.exe $(patsubst %.vg,%,$(word 3,$(subst /, ,$(1))))
+
+%.vg: export G_DEBUG=gc-friendly
+%.vg: export G_SLICE=always-malloc
+%.vg: export WINE=$(CURDIR)/build64/loader/wine
+%.vg: export WINEARCH=win64
+%.vg: export WINELOADERNOEXEC=1
+%.vg: export WINEPREFIX=$(CURDIR)/pfx
+%.vg: export WINESERVER=$(CURDIR)/build64/server/wineserver
+%.vg: export WINETEST=$(CURDIR)/build64/programs/winetest/x86_64-windows/winetest.exe
+%.vg: wine
+	$(MAKE) -C $(CURDIR)/.. valgrind 2>/dev/null 1>/dev/null
+	valgrind -q --leak-check=full --num-callers=100 --suppressions=$(WINE_SRC)/tools/valgrind.supp \
+	$(WINE) $(CURDIR)/build64/$(call make-valgrind,$@,x86_64-windows)
 
 else # MAKELEVEL
 
@@ -289,6 +304,9 @@ endif
 %.ok %/tests/check: tests
 	echo $@ done
 
+%.vg: wine
+	echo $@ done
+
 endif # MAKELEVEL
 
 
@@ -317,3 +335,12 @@ flamegraph:
 	-perf record --call-graph=dwarf -Fmax build64/wine cmd /c exit
 	perf script | stackcollapse-perf.pl | flamegraph.pl --width 1920 --bgcolors grey --hash --colors yellow --fonttype "mono" --fontsize 11 - > perf.svg
 	# firefox perf.svg
+
+
+xephyr: export D := :9
+xephyr:
+	Xephyr -sw-cursor -br -ac -glamor -screen 1280x720 $(D) & sleep 1
+	env DISPLAY=$(D) setxkbmap fr
+	env DISPLAY=$(D) openbox --sm-disable &
+	sleep 1000
+	killall Xephyr
