@@ -48,7 +48,7 @@ ifeq ($(lastword $(subst /, ,$(OBJ))),build-wine-llvm)
 DOCKER_IMAGE = rbernon/wine-llvm:experimental
 else
 ifeq ($(lastword $(subst /, ,$(OBJ))),build-wine-gitlab)
-DOCKER_IMAGE = rbernon/winehq:latest
+DOCKER_IMAGE = rbernon/winehq:gitlab
 else
 DOCKER_IMAGE = rbernon/wine:experimental
 endif
@@ -128,11 +128,17 @@ CFLAGS += -ffile-prefix-map=$(WINE_SRC)=. -ffile-prefix-map=../wine=.
 LDFLAGS = -Wl,--no-gc-sections
 endif
 
+ifneq ($(lastword $(subst /, ,$(OBJ))),build-wine-llvm)
+CFLAGS += -flarge-source-files
+endif
+
 ifneq ($(lastword $(subst /, ,$(OBJ))),build-wine)
+ifneq ($(lastword $(subst /, ,$(OBJ))),build-wine-llvm)
 ifneq ($(lastword $(subst /, ,$(OBJ))),build-wine-remote)
 ifneq ($(lastword $(subst /, ,$(OBJ))),build-wine-default)
 ifneq ($(lastword $(subst /, ,$(OBJ))),build-wine-gitlab)
 CONFIGURE_OPTS += --disable-tests
+endif
 endif
 endif
 endif
@@ -197,15 +203,22 @@ EndSection
 endef
 
 DRIVER := x11
+RENDERER := opengl
+VDESKTOP := false
 MONITORS := 1
 WM := fvwm
+WINELANG := C.UTF-8
 
 WM_EXEC_fvwm := /usr/bin/fvwm -f config -c "Style * MwmDecor" -c "Style * UsePPosition"
 WM_EXEC_kwin := /usr/bin/kwin_x11
 WM_EXEC_mutter := /usr/bin/mutter --x11
 WM_EXEC_openbox := /usr/bin/openbox
+WM_EXEC_gamescope := /usr/bin/gamescope
 
 tests/init: wine
+	pulseaudio --start --exit-idle-time=-1 && pulseaudio --check || \
+	(rm $(HOME)/.config/pulse* -rf && pulseaudio --start --exit-idle-time=-1 && pulseaudio --check)
+
 ifeq ($(DRIVER),wayland)
 	weston --backend=headless-backend.so &
 endif
@@ -228,8 +241,8 @@ ifeq ($(MONITORS),3)
 	xrandr 1>/dev/null
 endif
 endif
+
 	# ibus-daemon --verbose &
-	pulseaudio --start --exit-idle-time=-1
 	# setxkbmap -layout us,fr,de,us -variant ,,,dvorak
 
 make-test = $(word 1,$(subst /, ,$(1)))$(filter-out :check,$(patsubst %.ok,%,:$(word 3,$(subst /, ,$(1)))))
@@ -243,9 +256,11 @@ tests/win32: export WINE=$(CURDIR)/build32/wine
 tests/win32: export WINEPREFIX=$(CURDIR)/winetest/win32
 tests/win32: export WINESERVER=$(CURDIR)/build32/server/wineserver
 tests/win32: export WINETEST=$(CURDIR)/build32/programs/winetest/i386-windows/winetest.exe
-tests/win32: tests/init
+tests/win32: tests/init tests/win64
 	-rm -rf $(WINEPREFIX) && mkdir -p $(WINEPREFIX);
 	-WINEDEBUG=-all $(WINE) reg add HKCU\\Software\\Wine\\Drivers /v Graphics /d $(DRIVER) /f
+	-WINEDEBUG=-all $(WINE) reg add HKCU\\Software\\Wine\\Direct3D /v Renderer /d $(RENDERER) /f
+	-WINEDEBUG=-all $(VDESKTOP) && $(WINE) reg add HKCU\\Software\\Wine\\Explorer\\Desktops /v "Default" /d "800x600" /f
 	-$(WINESERVER) -kw
 ifeq ($(NOWINETEST),)
 	$(WINE) $(WINETEST) -c -o $(WINEPREFIX).report -t none -u localhost $(WINETESTS) || \
@@ -259,9 +274,11 @@ tests/win64: export WINE=$(CURDIR)/build64/wine
 tests/win64: export WINEPREFIX=$(CURDIR)/winetest/win64
 tests/win64: export WINESERVER=$(CURDIR)/build64/server/wineserver
 tests/win64: export WINETEST=$(CURDIR)/build64/programs/winetest/x86_64-windows/winetest.exe
-tests/win64: tests/init tests/win32
+tests/win64: tests/init
 	-rm -rf $(WINEPREFIX) && mkdir -p $(WINEPREFIX);
 	-WINEDEBUG=-all $(WINE) reg add HKCU\\Software\\Wine\\Drivers /v Graphics /d $(DRIVER) /f
+	-WINEDEBUG=-all $(WINE) reg add HKCU\\Software\\Wine\\Direct3D /v Renderer /d $(RENDERER) /f
+	-WINEDEBUG=-all $(VDESKTOP) && $(WINE) reg add HKCU\\Software\\Wine\\Explorer\\Desktops /v "Default" /d "800x600" /f
 	-$(WINESERVER) -kw
 ifeq ($(NOWINETEST),)
 	$(WINE) $(WINETEST) -c -o $(WINEPREFIX).report -t none -u localhost $(WINETESTS) || \
@@ -278,6 +295,8 @@ tests/wow64: export WINETEST=$(CURDIR)/build32/programs/winetest/i386-windows/wi
 tests/wow64: tests/init tests/win64
 	-rm -rf $(WINEPREFIX) && mkdir -p $(WINEPREFIX);
 	-WINEDEBUG=-all $(WINE) reg add HKCU\\Software\\Wine\\Drivers /v Graphics /d $(DRIVER) /f
+	-WINEDEBUG=-all $(WINE) reg add HKCU\\Software\\Wine\\Direct3D /v Renderer /d $(RENDERER) /f
+	-WINEDEBUG=-all $(VDESKTOP) && $(WINE) reg add HKCU\\Software\\Wine\\Explorer\\Desktops /v "Default" /d "800x600" /f
 	-$(WINESERVER) -kw
 ifeq ($(NOWINETEST),)
 	$(WINE) $(WINETEST) -c -o $(WINEPREFIX).report -t none -u localhost $(WINETESTS) || \
@@ -287,17 +306,22 @@ else
 endif
 
 tests: export WAYLAND_DISPLAY=wayland-1
-tests: export WINED3D_CONFIG=csmt=0
-tests: export LP_NUM_THREADS=0
+# tests: export WINED3D_CONFIG=csmt=0
+tests: export LP_NUM_THREADS=32
 tests: export DISPLAY=:0
 tests: export LC_ALL=$(WINELANG)
 ifeq ($(TESTEXE),)
-tests: tests/win32 tests/win64 # tests/wow64
+tests: tests/win64 tests/win32 # tests/wow64
 else
 tests: export WINE=$(CURDIR)/build64/wine
 tests: export WINEPREFIX=$(CURDIR)/pfx
 tests: export WINESERVER=$(CURDIR)/build64/server/wineserver
 tests: tests/init
+	-WINEDEBUG=-all $(WINE) reg add HKCU\\Software\\Wine\\Drivers /v Graphics /d $(DRIVER) /f
+	-WINEDEBUG=-all $(WINE) reg add HKCU\\Software\\Wine\\Direct3D /v Renderer /d $(RENDERER) /f
+	-WINEDEBUG=-all $(VDESKTOP) && $(WINE) reg add HKCU\\Software\\Wine\\Explorer\\Desktops /v "Default" /d "800x600" /f
+# 	valgrind -q --leak-check=full --num-callers=100 --suppressions=$(WINE_SRC)/tools/valgrind.supp \
+
 	$(WINE) $(TESTEXE)
 endif
 
